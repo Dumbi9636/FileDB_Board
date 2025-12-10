@@ -1,9 +1,6 @@
 package com.example.filedb.repository;
 
 import java.io.File;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.file.Files; // 파일/디렉토리 생성, 존재 여부 확인
 import java.nio.file.Path;  // 파일/디렉토리 경로 표현
 import java.nio.file.Paths; // 문자열로부터 Path 객체 생성
@@ -25,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 /*
 	1. JSON 파일로 저장 <작업 ㅇ>
 	2. 게시글 ID 생성 (시퀀스 파일 포함) <작업 ㅇ>
-	3. 파일 락 처리 
+	3. 파일 동시성 제어 ㅇ
 	4. 게시글 목록 가져오기 <작업 ㅇ>
 	5. 키워드 검색 (파일 필터링) <작업 ㅇ>
  */
@@ -97,60 +94,48 @@ public class FilePostRepository {
 	// 2. ID 시퀀스 생성
 	/* - sequence.json 파일에 대해 동시성 제어 적용
 	 * - sequenceLock 으로 JVM 내부 동시성 제어
-	 * - FileChannel + FileLock 으로 OS 레밸 파일락 고려
 	 */
 	private Long getNextId() {
-		// JVM 내부 동시성 제어
-		synchronized (sequenceLock) {
-			try {
-				// 시퀀스를 저장할 파일 경로: ./data/sequences.json
-				Path seqPath = Paths.get(basePath, "sequences.json");
-				File seqFile = seqPath.toFile();
-				
-				// 파일이 들어있는 상위 폴더(Path)를 가져올 수 있도록 디렉토리 생성
+	    // JVM 내부 동시성 제어
+	    synchronized (sequenceLock) {
+	        try {
+	            Path seqPath = Paths.get(basePath, "sequences.json");
+	            File seqFile = seqPath.toFile();
+
+	            // 상위 디렉토리 생성
 	            Files.createDirectories(seqPath.getParent());
-	            
-	            // 파일이 없으면 먼저 빈 파일 생성
-	            if (!seqFile.exists()) {
-	                seqFile.createNewFile();
-	            }
-				
-	            // OS 레벨 파일 락
-	            try (RandomAccessFile raf = new RandomAccessFile(seqFile, "rw");
-	                 FileChannel channel = raf.getChannel();
-	                 FileLock lock = channel.lock()) {
-	
-	                // === 여기부터는 OS + JVM 둘 다 lock 이 잡힌 상태 ===
-	                // 현재 시퀀스 값 읽기
-	                Map<String, Object> map;
-	                // 파일이 비어있지 않다면 JSON 읽기
-	                if (seqFile.length() > 0) {
-	                    map = objectMapper.readValue(seqFile, Map.class);
-	                } else {
-	                	// 파일이 비어있으면 기본값 세팅
-	                    map = new HashMap<>();
-	                    map.put("post", 0L);
+
+	            Map<String, Object> map;
+
+	            // 파일이 있고, 비어있지 않으면 JSON 읽기
+	            if (seqFile.exists() && seqFile.length() > 0) {
+	                try (var is = Files.newInputStream(seqPath)) {
+	                    map = objectMapper.readValue(is, Map.class);
 	                }
-	                
-	                // 기존 시퀀스 값 읽기 (파일이 Number 또는 Integer 로 저장될 수 있으므로 Object 로 캐스팅)
-	                Object raw = map.getOrDefault("post", 0);
-	                long current = (raw instanceof Number) ? ((Number) raw).longValue() : 0L;
-	                
-	                // 다음 ID 생성
-	                long next = current + 1;
-	                map.put("post", next);
-	
-	                // 변경된 시퀀스 값을 파일에 다시 저장 
-	                objectMapper.writerWithDefaultPrettyPrinter()
-	                        .writeValue(seqFile, map);
-	                
-	                // 새로운 ID 반환
-	                return next;
+	            } else {
+	                // 처음이면 기본값 세팅
+	                map = new HashMap<>();
+	                map.put("post", 0L);
 	            }
+
+	            // 기존 시퀀스 값 읽기
+	            Object raw = map.getOrDefault("post", 0);
+	            long current = (raw instanceof Number) ? ((Number) raw).longValue() : 0L;
+
+	            long next = current + 1;
+	            map.put("post", next);
+
+	            // 변경된 시퀀스 값을 파일에 다시 저장
+	            try (var os = Files.newOutputStream(seqPath)) {
+	                objectMapper.writerWithDefaultPrettyPrinter()
+	                        .writeValue(os, map);
+	            }
+
+	            return next;
 	        } catch (Exception e) {
 	            throw new RuntimeException("시퀀스 생성 오류", e);
 	        }
-		}
+	    }
 	}
 	
 	// 3. ID 로 단건 조회 

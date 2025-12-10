@@ -2,6 +2,7 @@ package com.example.filedb.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -9,15 +10,25 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 	/*
-		브라우저에서 http://localhost:8080/images/1.jpg 요청하면
+		브라우저에서 http://localhost:9090/images/1.jpg 요청하면
 		실제로는 ./uploads/1.jpg 파일을 읽어서 보여줄 수 있도록 
 	 */
 	@Value("${filedb.upload-path}")
 	private String uploadPath;
 	
+	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
 		// /images/1.jpg -> {uploadPath}/1.jpg
 		registry.addResourceHandler("/images/**")
 		.addResourceLocations("file:" + uploadPath + "/");
 	}
+	
+	 @Override
+	    public void addCorsMappings(CorsRegistry registry) {
+	        registry.addMapping("/**")
+	            .allowedOrigins("http://localhost:5173")
+	            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+	            .allowedHeaders("*")
+	            .allowCredentials(true);
+	    }
 }

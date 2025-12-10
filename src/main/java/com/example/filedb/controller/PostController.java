@@ -1,6 +1,7 @@
 package com.example.filedb.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -63,15 +64,15 @@ public class PostController {
 		postService.deletePost(id);
 	}
 	
-	// 5. 게시글 이미지 업로드
-	// POST /posts/{id}image
-	// form-data 로 file 필드에 파일 첨부 
-	@PostMapping(
-			value = "/{id}/image",
-			consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public PostDto uploadPostImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
-		return postService.uploadPostImage(id, file);
-	}
+//	// 5. 게시글 이미지 업로드
+//	// POST /posts/{id}image
+//	// form-data 로 file 필드에 파일 첨부 
+//	@PostMapping(
+//			value = "/{id}/image",
+//			consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//	public PostDto uploadPostImage(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+//		return postService.uploadPostImage(id, file);
+//	}
 	
 	// 6. 전체 목록 페이징 조회
 	// GET /posts?page=0&size=10
@@ -92,4 +93,14 @@ public class PostController {
 		return postService.searchPostsPage(keyword, page, size);
 	}
 	
+	// 8. 에디터(Toast UI)용 이미지 업로드
+	// POST /posts/images
+	@PostMapping(
+	        value = "/images",
+	        consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public Map<String, String> uploadEditorImage(@RequestPart("file") MultipartFile file) {
+	    String url = postService.uploadEditorImage(file); // 저장 후 접근 가능한 URL 반환
+	    return Map.of("url", url);
+	}
+
 }

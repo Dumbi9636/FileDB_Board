@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.example.filedb.dto.PostDto;
 import com.example.filedb.dto.PostPageResponse;
@@ -220,4 +221,52 @@ public class PostService {
     	return slicePage(all, page, size);
     }
     
+    // 11. UI 에디터 이미지 업로드 
+    public String uploadEditorImage(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("업로드할 파일이 없습니다.");
+        }
+
+        // 업로드 디렉토리: {uploadPath}/editor
+        File dir = new File(uploadPath, "editor").getAbsoluteFile();
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            if (!created) {
+                throw new RuntimeException("에디터 이미지 저장 폴더를 생성할 수 없습니다.");
+            }
+        }
+
+        // 원본 파일명에서 확장자 추출
+        String originalName = file.getOriginalFilename();
+        String extension = "";
+        if (originalName != null && originalName.lastIndexOf(".") != -1) {
+            extension = originalName.substring(originalName.lastIndexOf("."));
+        }
+        if (extension.isBlank()) {
+            extension = ".dat";
+        }
+
+        // 저장할 파일명: 현재시간-랜덤값.확장자
+        String savedFilename = System.currentTimeMillis() + "-" + Math.round(Math.random() * 100000) + extension;
+
+        // 실제 저장할 파일 객체
+        File dest = new File(dir, savedFilename);
+
+        try {
+            file.transferTo(dest);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException("에디터 이미지 저장 중 오류 발생", e);
+        }
+
+        // 절대 URL 생성 (http://localhost:9090/images/editor/xxxx.png)
+        String url = ServletUriComponentsBuilder
+                .fromCurrentContextPath()   // http://localhost:9090
+                .path("/images/editor/")
+                .path(savedFilename)
+                .toUriString();
+
+        return url;
+    }
+
 }
