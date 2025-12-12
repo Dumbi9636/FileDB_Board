@@ -227,7 +227,7 @@ public class PostService {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
         }
 
-        // 업로드 디렉토리: {uploadPath}/editor
+        // 업로드 디렉토리: application.properties의 filedb.upload-path 값 사용
         File dir = new File(uploadPath, "editor").getAbsoluteFile();
         if (!dir.exists()) {
             boolean created = dir.mkdirs();
